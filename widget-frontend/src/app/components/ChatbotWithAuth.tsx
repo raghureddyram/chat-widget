@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Chatbox from "./Chatbot"
+import ChatWidget from './ChatWidget';
 
 const ChatboxWithAuth: React.FC = () => {
     
@@ -28,7 +29,7 @@ const ChatboxWithAuth: React.FC = () => {
   }, []);
 
   // Show chatbox only if user is logged in
-  return user ? <Chatbox /> : null;
+  return user ? <ChatWidget /> : null;
 };
 
 export default ChatboxWithAuth;

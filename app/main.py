@@ -49,10 +49,23 @@ def welcome(request: Request):
         context={'request': request, 'user': user}
     )
 
-# Session API route (optional)
 @app.get("/api/session")
 def get_session(request: Request):
     user = request.session.get('user')
     if user:
         return {"user": user}
     return {"user": None}
+
+
+@app.get("/api/initial-messages")
+def get_initial_messages():
+    return [{"type": "bot", "text": "Hi Jane, how can I assist you today?"}]
+
+# Send message endpoint
+@app.post("/api/send-message")
+async def send_message(request: Request):
+    data = await request.json()
+    user_message = data['message']
+    # open ai call or code generator to create document
+    response_message = f"I see that you said: {user_message}"
+    return {"reply": response_message}
