@@ -1,12 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth, OAuthError
-from .config import CLIENT_ID, CLIENT_SECRET
+from .config import CLIENT_ID, CLIENT_SECRET, SessionLocal
 from fastapi.staticfiles import StaticFiles
+from .models import User
+from sqlalchemy.orm import Session
 import pdb
 
 app = FastAPI()
@@ -35,17 +37,14 @@ oauth.register(
     }
 )
 
-
-
 templates = Jinja2Templates(directory="templates")
 
-@app.get("/api/session")
-def get_session(request: Request):
-    user = request.session.get('user')
-    if user:
-        return {"user": user}
-    return {"user": None}
-
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 @app.get("/")
 def index(request: Request):
@@ -59,17 +58,6 @@ def index(request: Request):
     )
 
 
-@app.get('/welcome')
-def welcome(request: Request):
-    user = request.session.get('user')
-    if not user:
-        return RedirectResponse('/')
-    return templates.TemplateResponse(
-        name='welcome.html',
-        context={'request': request, 'user': user}
-    )
-
-
 @app.get("/login")
 async def login(request: Request):
     url = request.url_for('auth')
@@ -77,7 +65,7 @@ async def login(request: Request):
 
 
 @app.get('/auth')
-async def auth(request: Request):
+async def auth(request: Request, db: Session = Depends(get_db)):
     try:
         token = await oauth.google.authorize_access_token(request)
     except OAuthError as e:
@@ -85,9 +73,22 @@ async def auth(request: Request):
             name='error.html',
             context={'request': request, 'error': e.error}
         )
-    user = token.get('userinfo')
-    if user:
-        request.session['user'] = dict(user)
+    user_info = token.get('userinfo')
+    pdb.set_trace()
+    if user_info:
+        # Check if the user exists in the database by email
+        user = db.query(User).filter(User.email == user_info['email']).first()
+
+        # If user doesn't exist, create a new one
+        if not user:
+            user = User(name=user_info['name'], email=user_info['email'])
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+        # Store the user info in the session
+        request.session['user'] = {'id': str(user.id), 'name': user.name, 'email': user.email}
+    
     return RedirectResponse('http://localhost:3000')
 
 
@@ -98,3 +99,23 @@ def logout(request: Request):
     response = RedirectResponse('/')
     response.delete_cookie(key="session")
     return response
+
+# ----------------------------
+@app.get('/welcome')
+def welcome(request: Request):
+    user = request.session.get('user')
+    if not user:
+        return RedirectResponse('/')
+    return templates.TemplateResponse(
+        name='welcome.html',
+        context={'request': request, 'user': user}
+    )
+
+# ----------------------------
+
+@app.get("/api/session")
+def get_session(request: Request):
+    user = request.session.get('user')
+    if user:
+        return {"user": user}
+    return {"user": None}
