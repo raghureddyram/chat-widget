@@ -9,7 +9,6 @@ from .config import CLIENT_ID, CLIENT_SECRET, SessionLocal
 from fastapi.staticfiles import StaticFiles
 from .models import User
 from sqlalchemy.orm import Session
-import pdb
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, 
@@ -74,7 +73,6 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             context={'request': request, 'error': e.error}
         )
     user_info = token.get('userinfo')
-    pdb.set_trace()
     if user_info:
         # Check if the user exists in the database by email
         user = db.query(User).filter(User.email == user_info['email']).first()
