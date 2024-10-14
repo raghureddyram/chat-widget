@@ -2,22 +2,30 @@
 import React, { useState, useEffect } from 'react';
 import styles from '../css/ChatWidget.module.css';
 
+type Messages = {
+    messages: Message[]
+}
 
 type Message = {
   type: 'user' | 'bot';
   text: string;
 };
 
-const ChatWidget: React.FC = () => {
+interface ChatWidgetProps {
+    userId: string;  // Expect userId to be a string
+  }
+
+  const ChatWidget: React.FC<ChatWidgetProps> = ({ userId }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState<string>(''); 
   const [showWidget, setShowWidget] = useState<boolean>(true); 
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/initial-messages')
+    fetch(`http://localhost:8000/api/users/${userId}/messages`)
       .then((res) => res.json())
-      .then((data: Message[]) => {
-        setMessages(data);
+      .then((data: any) => {
+        debugger
+        setMessages(data.messages);
       });
   }, []);
 
@@ -28,7 +36,7 @@ const ChatWidget: React.FC = () => {
 
     try {
       
-      const response = await fetch('/api/send-message', {
+      const response = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: input }),

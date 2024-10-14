@@ -11,5 +11,5 @@ class Chat(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     title = Column(String, nullable=False)
     
-    user = relationship("User", back_populates="chats")
-    chat_lines = relationship("ChatLine", back_populates="chat")
+    user = relationship("User", back_populates="chat")
+    messages = relationship("Message", back_populates="chat")

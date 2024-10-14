@@ -11,5 +11,5 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     
-    # One user can have many chats
-    chats = relationship("Chat", back_populates="user")
+    # One user can have one chat
+    chat = relationship("Chat", back_populates="user", uselist=False)

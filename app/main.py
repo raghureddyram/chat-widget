@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -6,6 +6,9 @@ from starlette.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
 from .auth_router import router as auth_router
+from .models import User, Message, Chat
+from .config import get_db
+from sqlalchemy.orm import Session
 
 app = FastAPI()
 
@@ -57,12 +60,33 @@ def get_session(request: Request):
     return {"user": None}
 
 
-@app.get("/api/initial-messages")
-def get_initial_messages():
-    return [{"type": "bot", "text": "Hi Jane, how can I assist you today?"}]
+@app.get("/api/users/{userId}/messages")
+def get_user_messages(userId: str, db: Session = Depends(get_db)):
+    # Check if the user exists
+    user = db.query(User).filter(User.id == userId).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    chat = db.query(Chat).filter(Chat.user_id == user.id).first()
+
+    if not chat:
+        chat = Chat(user_id=user.id, title="Default chat")
+        db.add(chat)
+        db.commit()
+        db.refresh(chat)
+
+    # Fetch messages tied to the user
+    messages = db.query(Message).filter(Message.chat_id == chat.id).all()
+
+    # If the user has no messages for their chat, return the default message
+    if not messages:
+        messages = [{"type": "bot", "text": "Hi Jane, how can I assist you today?"}]
+        return {"messages": messages}
+
+    # Return the user's messages
+    return {"user": user.name, "messages": messages}
 
 # Send message endpoint
-@app.post("/api/send-message")
+@app.post("/api/users/{userId}/messages")
 async def send_message(request: Request):
     data = await request.json()
     user_message = data['message']

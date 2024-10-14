@@ -4,9 +4,15 @@ import React, { useEffect, useState } from 'react';
 import Chatbox from "./Chatbot"
 import ChatWidget from './ChatWidget';
 
+interface User {
+    id: string;
+    name: string;
+    email: string;
+  }
+
 const ChatboxWithAuth: React.FC = () => {
     
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
 
   
   const getSession = async () => {
@@ -29,7 +35,7 @@ const ChatboxWithAuth: React.FC = () => {
   }, []);
 
   // Show chatbox only if user is logged in
-  return user ? <ChatWidget /> : null;
+  return user ? <ChatWidget userId={user.id} /> : null;
 };
 
 export default ChatboxWithAuth;

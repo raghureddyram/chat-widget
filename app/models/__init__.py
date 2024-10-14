@@ -1,4 +1,4 @@
 from .user import User
 from .chat import Chat
-from .chat_line import ChatLine
+from .message import Message
 from .base import Base
