@@ -8,6 +8,7 @@ load_dotenv()
 
 CLIENT_ID = os.environ.get('CLIENT_ID', None)
 CLIENT_SECRET = os.environ.get('CLIENT_SECRET', None)
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', None)
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://raghureddy:@localhost/chat_app")
 
 
