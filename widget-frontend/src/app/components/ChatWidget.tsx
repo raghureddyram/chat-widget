@@ -23,8 +23,7 @@ interface ChatWidgetProps {
   useEffect(() => {
     fetch(`http://localhost:8000/api/users/${userId}/messages`)
       .then((res) => res.json())
-      .then((data: any) => {
-        debugger
+      .then((data: Messages) => {
         setMessages(data.messages);
       });
   }, []);
