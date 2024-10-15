@@ -3,10 +3,8 @@ import re
 import importlib
 import subprocess
 import sys
-import tempfile
 from openai import OpenAI
 from ..config import OPENAI_API_KEY
-import pdb
 import uuid
 from pathlib import Path
 

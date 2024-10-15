@@ -1,11 +1,11 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
-
 from app.agents.code_generator import CodeGenerator
 from app.models.chat import ChatContextType
 from app.models.message import MessageType
@@ -16,7 +16,7 @@ from .config import get_db
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from pathlib import Path
-import pdb
+import os
 
 app = FastAPI()
 
@@ -69,8 +69,7 @@ def get_session(request: Request):
 
 @app.get("/api/users/{userId}/chats/{chatContext}/messages")
 def get_user_messages(userId: str, chatContext: str, db: Session = Depends(get_db)):
-    
-    user = db.query(User).filter(User.id == userId).first()
+    user = User.get_by_id(db, userId)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -79,44 +78,13 @@ def get_user_messages(userId: str, chatContext: str, db: Session = Depends(get_d
     except KeyError:
         raise HTTPException(status_code=400, detail="Invalid chat context")
 
-    # Try to fetch the chat, create if it doesn't exist
-    try:
-        chat = db.query(Chat).filter(
-            Chat.user_id == user.id,
-            Chat.context == chat_context_enum
-        ).first()
+    chat = user.get_or_create_chat(db, chat_context_enum)
+    messages = chat.get_messages(db)
 
-        if not chat:
-            chat = Chat(user_id=user.id, context=chat_context_enum)
-            db.add(chat)
-            db.commit()
-            db.refresh(chat)
-
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Database error occurred")
-
-    # Fetch messages tied to the chat
-    messages = db.query(Message).filter(Message.chat_id == chat.id).all()
-
-    # If the chat has no messages, create a default message
     if not messages:
-        try:
-            first_message = Message(
-                chat_id=chat.id,
-                content="Hi Jane, how can I assist you today?",
-                line_type="SYSTEM"
-            )
-            db.add(first_message)
-            db.commit()
-            db.refresh(first_message)
-            messages = [first_message]
-        except SQLAlchemyError as e:
-            db.rollback()
-            raise HTTPException(status_code=500, detail="Error creating default message")
+        first_message = chat.add_message(db, "Hi Jane, how can I assist you today?", MessageType.SYSTEM)
+        messages = [first_message]
 
-    
-    # Serialize messages
     serialized_messages = [
         {
             "id": str(message.id),
@@ -126,7 +94,6 @@ def get_user_messages(userId: str, chatContext: str, db: Session = Depends(get_d
         } for message in messages
     ]
 
-    # Return the user's messages
     return {
         "user": user.name,
         "chat_context": chat_context_enum.value,
@@ -137,6 +104,9 @@ def get_user_messages(userId: str, chatContext: str, db: Session = Depends(get_d
 async def send_message(userId: str, chatContext: str, request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     
+    user = User.get_by_id(db, userId)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     chat_context_enum = ChatContextType[chatContext.upper()]
     line_type = data.get('line_type')
     if not line_type:
@@ -148,28 +118,10 @@ async def send_message(userId: str, chatContext: str, request: Request, db: Sess
     if not user_message_content:
         raise HTTPException(status_code=400, detail="Message content cannot be empty")
     
-    # Check if user exists
-    user = db.query(User).filter(User.id == userId).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
     # Find or create the chat with the given context
-    chat = db.query(Chat).filter(Chat.user_id == user.id, Chat.context == chat_context_enum).first()
-    if not chat:
-        chat = Chat(user_id=user.id, context=chat_context_enum)
-        db.add(chat)
-        db.commit()
-        db.refresh(chat)
-    
+    chat = user.get_or_create_chat(db, chat_context_enum)
     # Save the user's message
-    user_message = Message(
-        chat_id=chat.id,
-        content=user_message_content,
-        line_type=line_type_enum
-    )
-    db.add(user_message)
-    db.commit()
-    db.refresh(user_message)
+    user_message = chat.add_message(db, user_message_content, line_type_enum)
 
     generator = CodeGenerator()
     resp, error = generator.run(user_message_content, userId)
@@ -184,16 +136,9 @@ async def send_message(userId: str, chatContext: str, request: Request, db: Sess
         db.refresh(new_user_file)
         output_view_url = f"http://localhost:8000/api/users/{userId}/user-files/{new_user_file.id}"
         generated_content = f"I've generated some output. link: {output_view_url}"
-       
     
     # Save the system message
-    system_message_2 = Message(
-        chat_id=chat.id,
-        content=generated_content,
-        line_type=MessageType["SYSTEM"]
-    )
-    db.add(system_message_2)
-    db.commit()
+    system_message = chat.add_message(db, generated_content, MessageType.SYSTEM)
 
     return {
         "user": user.name,
@@ -263,4 +208,27 @@ async def update_message(userId: str, chatContext: str, messageId: str, request:
         },
         "errors": []
     }
+
+# Serve static files from the output directory
+app.mount("/output", StaticFiles(directory="output"), name="output")
+
+
+# Endpoint to download a generated file
+@app.get("/api/users/{userId}/user-files/{userFileId}")
+async def get_user_file(userId: str, userFileId: str, request: Request, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == userId).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user_file = user.get_file(db, userFileId)  # Assuming user.get_file is defined
+
+    # Construct the file path
+    output_dir = Path(os.getcwd()) / 'output' / 'users' / userId
+    file_path = output_dir / user_file.file_name
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Serve the file for downloading or embedding
+    return FileResponse(file_path)
     

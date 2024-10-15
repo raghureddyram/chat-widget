@@ -1,3 +1,4 @@
+from requests import Session
 from sqlalchemy import Column, ForeignKey, Text, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -21,3 +22,12 @@ class Message(Base):
     created_date = Column(DateTime, default=func.now()) 
     
     chat = relationship("Chat", back_populates="messages")
+
+    @classmethod
+    def get_by_id(cls, db: Session, message_id: str):
+        return db.query(cls).filter(cls.id == message_id).first()
+
+    def update_content(self, db: Session, new_content: str):
+        self.content = new_content
+        db.commit()
+        db.refresh(self)

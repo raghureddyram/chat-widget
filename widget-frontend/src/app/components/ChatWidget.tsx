@@ -21,7 +21,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
   const [showWidget, setShowWidget] = useState<boolean>(true);
   const [chatContext, setChatContext] = useState("Onboarding");
   const [isEdit, setIsEdit] = useState(false);
-  const [newMessage, setNewMessage] = useState<Message>({ line_type: 'user', content: input });
+  const defaultMessage: Message = { line_type: 'user', content: input };
+  const [newMessage, setNewMessage] = useState<Message>(defaultMessage);
 
   const getMessages = async () => {
     const resp = await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages`);
@@ -59,6 +60,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
         });
         setIsEdit(false)
         setInput('')
+        setNewMessage(defaultMessage)
         await getMessages()
     } catch(e){
         console.log(e)
@@ -86,12 +88,13 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
     if(isEdit){
         return handleEdit(newMessage)
     }
-    
+
+    const message = { ...newMessage, content: input}
     try {
       await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newMessage),
+        body: JSON.stringify(message),
       });
       await getMessages()
       setInput('');
