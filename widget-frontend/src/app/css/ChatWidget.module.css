@@ -28,17 +28,19 @@
     overflow-y: auto;
   }
   
-  .chatMessage.user {
+  .user-message {
     text-align: right;
-    background-color: #E2FFE2;
+    background-color: #8b1ba8;
+    color: white;
     border-radius: 10px;
     margin: 5px;
     padding: 10px;
   }
-  
-  .chatMessage.bot {
+
+  .system-message {
     text-align: left;
-    background-color: #F0F0F0;
+    background-color: #ffb6c1;
+    color: black;
     border-radius: 10px;
     margin: 5px;
     padding: 10px;

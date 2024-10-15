@@ -7,30 +7,44 @@ type Messages = {
 }
 
 type Message = {
-  type: 'user' | 'bot';
-  text: string;
+  id?: string;
+  line_type: 'user' | 'system';
+  content: string;
+  created_date?: string;
 };
 
 interface ChatWidgetProps {
-    userId: string;  // Expect userId to be a string
+    userId: string;
   }
 
   const ChatWidget: React.FC<ChatWidgetProps> = ({ userId }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState<string>(''); 
   const [showWidget, setShowWidget] = useState<boolean>(true); 
+  const [chatContext, setChatContext] = useState("Onboarding");
+
+
+  const getMessages = async () => {
+    const resp = await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages`)
+    if(resp?.status === 200){
+        const jsonData = await resp.json();
+        setMessages(jsonData.messages)
+        
+    }
+  }
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/users/${userId}/messages`)
-      .then((res) => res.json())
-      .then((data: Messages) => {
-        setMessages(data.messages);
-      });
+    getMessages()
   }, []);
+
+  useEffect(() => {
+    getMessages()
+  }, [chatContext]);
+
 
   
   const sendMessage = async () => {
-    const newMessage: Message = { type: 'user', text: input };
+    const newMessage: Message = { line_type: 'user', content: input };
     setMessages((prevMessages) => [...prevMessages, newMessage]);
 
     try {
@@ -42,7 +56,7 @@ interface ChatWidgetProps {
       });
 
       const data = await response.json();
-      const botMessage: Message = { type: 'bot', text: data.reply };
+      const botMessage: Message = { line_type: 'system', content: data.reply };
 
       setMessages((prevMessages) => [...prevMessages, botMessage]);
       setInput('');
@@ -60,9 +74,9 @@ interface ChatWidgetProps {
         <button onClick={() => setShowWidget(false)}>Close</button>
       </div>
       <div className={styles.chatBody}>
-        {messages.map((message, idx) => (
-          <div key={idx} className={styles[message.type]}>
-            <p>{message.text}</p>
+        {messages.map((message: Message, idx) => (
+          <div key={idx} className={styles[`${message.line_type}-message`]}>
+            <p>{message.content}</p>
           </div>
         ))}
       </div>
