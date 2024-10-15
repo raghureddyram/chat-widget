@@ -10,7 +10,38 @@ from pathlib import Path
 
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
+class CodeGenerator:
+    def __init__(self):
+        self.openai_helper = OpenAIHelper()
+        self.library_manager = LibraryManager()
+        self.code_executor = CodeExecutor()
 
+    def run(self, prompt, requestor_id=''):
+        print(f"Generating code for: {prompt}")
+        
+        # Generate the Python code based on the prompt
+        code = self.openai_helper.generate_code(prompt)
+        
+        print("Generated code:")
+        print(code)
+        
+        # Install any libraries mentioned in the code
+        self.library_manager.install_libraries(code)
+        
+        print("\nExecuting code...")
+        
+        # Execute the generated code
+        output, error = self.code_executor.execute_code(code, requestor_id)
+
+        # Print the output or errors from code execution
+        if output:
+            print("Output:")
+            print(output)
+        if error:
+            print("Error:")
+            print(error)
+        return (output, error)
+    
 class OpenAIHelper:
     def __init__(self):
         self.client = OpenAI()
@@ -51,10 +82,6 @@ class LibraryManager:
                     print(f"Installing {lib}...")
                     subprocess.check_call([sys.executable, "-m", "pip", "install", lib])
             print("Libraries installed successfully.")
-
-
-
-
 
 class CodeExecutor:
     @staticmethod
@@ -106,36 +133,3 @@ class CodeExecutor:
                     output = new_file_path
         
         return output, error
-
-
-class CodeGenerator:
-    def __init__(self):
-        self.openai_helper = OpenAIHelper()
-        self.library_manager = LibraryManager()
-        self.code_executor = CodeExecutor()
-
-    def run(self, prompt, requestor_id=''):
-        print(f"Generating code for: {prompt}")
-        
-        # Generate the Python code based on the prompt
-        code = self.openai_helper.generate_code(prompt)
-        
-        print("Generated code:")
-        print(code)
-        
-        # Install any libraries mentioned in the code
-        self.library_manager.install_libraries(code)
-        
-        print("\nExecuting code...")
-        
-        # Execute the generated code
-        output, error = self.code_executor.execute_code(code, requestor_id)
-
-        # Print the output or errors from code execution
-        if output:
-            print("Output:")
-            print(output)
-        if error:
-            print("Error:")
-            print(error)
-        return (output, error)

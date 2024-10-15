@@ -124,19 +124,7 @@ async def send_message(userId: str, chatContext: str, request: Request, db: Sess
     # Save the user's message
     user_message = chat.add_message(db, user_message_content, line_type_enum)
 
-    generator = CodeGenerator()
-    resp, error = generator.run(user_message_content, userId)
-    generated_content = "I've finished working and determined that I can't perform this action"
-
-    if resp and not error:
-        file = Path(resp)
-        file_name = file.name
-        new_user_file = UserFile(file_name=file_name, user_id=user.id)
-        db.add(new_user_file)
-        db.commit()
-        db.refresh(new_user_file)
-        output_view_url = f"http://localhost:8000/api/users/{userId}/user-files/{new_user_file.id}"
-        generated_content = f"I've generated some output. link: {output_view_url}"
+    generated_content = run_generator(db, user_message_content, userId)
     
     # Save the system message
     system_message = chat.add_message(db, generated_content, MessageType.SYSTEM)
@@ -200,19 +188,7 @@ async def update_message(userId: str, chatContext: str, messageId: str, request:
     db.commit()
     db.refresh(message)
 
-    generator = CodeGenerator()
-    resp, error = generator.run(new_content, userId)
-    generated_content = "I've finished working and determined that I can't perform this action"
-
-    if resp and not error:
-        file = Path(resp)
-        file_name = file.name
-        new_user_file = UserFile(file_name=file_name, user_id=user.id)
-        db.add(new_user_file)
-        db.commit()
-        db.refresh(new_user_file)
-        output_view_url = f"http://localhost:8000/api/users/{userId}/user-files/{new_user_file.id}"
-        generated_content = f"I've generated some output. link: {output_view_url}"
+    generated_content = run_generator(db, new_content, userId)
     
     # Save the system message
     system_message = chat.add_message(db, generated_content, MessageType.SYSTEM)
@@ -250,3 +226,20 @@ async def get_user_file(userId: str, userFileId: str, request: Request, db: Sess
     # Serve the file for downloading or embedding
     return FileResponse(file_path)
     
+
+def run_generator(db, content, userId):
+    generator = CodeGenerator()
+    resp, error = generator.run(content, userId)
+    generated_content = "I've finished working and determined that I can't perform this action"
+
+    if resp and not error:
+        file = Path(resp)
+        file_name = file.name
+        new_user_file = UserFile(file_name=file_name, user_id=userId)
+        db.add(new_user_file)
+        db.commit()
+        db.refresh(new_user_file)
+        output_view_url = f"http://localhost:8000/api/users/{userId}/user-files/{new_user_file.id}"
+        generated_content = f"I've generated some output. link: {output_view_url}"
+
+    return generated_content
