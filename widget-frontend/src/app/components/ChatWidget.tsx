@@ -91,6 +91,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
     }
 
     const message = { ...newMessage, content: input}
+    setMessages([...messages, message])
+    setInput('')
     try {
       await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages`, {
         method: 'POST',
