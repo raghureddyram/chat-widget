@@ -23,6 +23,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
   const [isEdit, setIsEdit] = useState(false);
   const defaultMessage: Message = { line_type: 'user', content: input };
   const [newMessage, setNewMessage] = useState<Message>(defaultMessage);
+  const [expanded, setExpanded] = useState(false)
 
   const getMessages = async () => {
     const resp = await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages`);
@@ -103,6 +104,11 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
     }
   };
 
+  const handleCreateReport = () => {
+    setIsEdit(false)
+    setInput("Create a csv report of MSFT yearly revenue for 2 years")
+  }
+
   if (!showWidget) return <button onClick={() => setShowWidget(true)} className={styles.openButton}>Open Chat</button>;
 
   const createHtmlByContent = (content: string) => {
@@ -114,9 +120,9 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
     return (<p>{content}</p>)
   }
   return (
-    <div className={styles.chatWidget}>
+    <div className={styles[`chatWidget${expanded ? 'Expanded' : ''}`]} >
       <div className={styles.chatHeader}>
-        <button className={styles.expandButton}>↔</button>
+        <button className={styles.expandButton} onClick={() => setExpanded(!expanded)}>↔</button>
         <button className={styles.closeButton} onClick={() => setShowWidget(false)}>×</button>
       </div>
       <div className={styles.avatarSection}>
@@ -150,8 +156,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
       </div>
       {messages.length > 0 && (
         <div className={styles.actionButtons}>
-          <button className={styles.actionButton}>Create Report this month</button>
-          <button className={styles.actionButton}>Call Lead</button>
+          <button className={styles.actionButton} onClick={() => {handleCreateReport()} }>Create Report this month</button>
         </div>
       )}
       <div className={styles.chatFooter}>
@@ -171,6 +176,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
           onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
           className={styles.input}
         />
+        <button onClick={() => sendMessage()} className="sendButton">{'>'}</button>
       </div>
     </div>
   );
