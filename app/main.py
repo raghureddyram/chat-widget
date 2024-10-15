@@ -82,7 +82,7 @@ def get_user_messages(userId: str, chatContext: str, db: Session = Depends(get_d
     messages = chat.get_messages(db)
 
     if not messages:
-        first_message = chat.add_message(db, "Hi Jane, how can I assist you today?", MessageType.SYSTEM)
+        first_message = chat.add_message(db, f"Hi {user.name}, how can I assist you today?", MessageType.SYSTEM)
         messages = [first_message]
 
     serialized_messages = [
