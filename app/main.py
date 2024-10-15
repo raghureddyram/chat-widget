@@ -97,7 +97,8 @@ def get_user_messages(userId: str, chatContext: str, db: Session = Depends(get_d
     return {
         "user": user.name,
         "chat_context": chat_context_enum.value,
-        "messages": serialized_messages
+        "messages": serialized_messages,
+        "details": "all messages by user chat context"
     }
 
 @app.post("/api/users/{userId}/chats/{chatContext}/messages")
@@ -143,7 +144,7 @@ async def send_message(userId: str, chatContext: str, request: Request, db: Sess
     return {
         "user": user.name,
         "chat_context": chat_context_enum.value,
-        "errors": []
+        "details": generated_content
     }
 
 @app.delete("/api/users/{userId}/chats/{chatContext}/messages/{messageId}")
@@ -165,7 +166,7 @@ async def delete_message(userId: str, chatContext: str, messageId: str, request:
     return {
         "user": user.name,
         "chat_context": chat_context_enum.value,
-        "errors": []
+        "details": "Delete success, please refresh messages"
     }
 
 @app.put("/api/users/{userId}/chats/{chatContext}/messages/{messageId}")
@@ -199,6 +200,23 @@ async def update_message(userId: str, chatContext: str, messageId: str, request:
     db.commit()
     db.refresh(message)
 
+    generator = CodeGenerator()
+    resp, error = generator.run(new_content, userId)
+    generated_content = "I've finished working and determined that I can't perform this action"
+
+    if resp and not error:
+        file = Path(resp)
+        file_name = file.name
+        new_user_file = UserFile(file_name=file_name, user_id=user.id)
+        db.add(new_user_file)
+        db.commit()
+        db.refresh(new_user_file)
+        output_view_url = f"http://localhost:8000/api/users/{userId}/user-files/{new_user_file.id}"
+        generated_content = f"I've generated some output. link: {output_view_url}"
+    
+    # Save the system message
+    system_message = chat.add_message(db, generated_content, MessageType.SYSTEM)
+
     return {
         "user": user.name,
         "chat_context": chat_context_enum.value,
@@ -206,7 +224,7 @@ async def update_message(userId: str, chatContext: str, messageId: str, request:
             "id": message.id,
             "content": message.content,
         },
-        "errors": []
+        "details": generated_content
     }
 
 # Serve static files from the output directory
