@@ -20,6 +20,8 @@ poetry shell; python server.py
 
 Authentication - to use this app, the user must have google authentication enabled.
 
+
+Create a .env file (based on the .env.copy) file that has the following:
 ```
 CLIENT_ID=get_from_google
 CLIENT_SECRET=get_from_google
