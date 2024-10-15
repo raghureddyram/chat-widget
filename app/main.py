@@ -6,7 +6,9 @@ from starlette.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.agents.code_generator import CodeGenerator
 from app.models.chat import ChatContextType
+from app.models.message import MessageType
 from .auth_router import router as auth_router
 from .models import User, Message, Chat
 from .config import get_db
@@ -128,11 +130,85 @@ def get_user_messages(userId: str, chatContext: str, db: Session = Depends(get_d
         "messages": serialized_messages
     }
 
-# Send message endpoint
-@app.post("/api/users/{userId}/messages")
-async def send_message(request: Request):
+@app.post("/api/users/{userId}/chats/{chatContext}/messages")
+async def send_message(userId: str, chatContext: str, request: Request, db: Session = Depends(get_db)):
     data = await request.json()
-    user_message = data['message']
-    # open ai call or code generator to create document
-    response_message = f"I see that you said: {user_message}"
-    return {"reply": response_message}
+    
+    chat_context_enum = ChatContextType[chatContext.upper()]
+    line_type = data.get('line_type')
+    if not line_type:
+        raise HTTPException(status_code=400, detail="Message line_type missing")
+    line_type_enum = MessageType[line_type.upper()]
+    
+    # Extract the user content
+    user_message_content = data.get('content')
+    if not user_message_content:
+        raise HTTPException(status_code=400, detail="Message content cannot be empty")
+    
+    # Check if user exists
+    user = db.query(User).filter(User.id == userId).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Find or create the chat with the given context
+    chat = db.query(Chat).filter(Chat.user_id == user.id, Chat.context == chat_context_enum).first()
+    if not chat:
+        chat = Chat(user_id=user.id, context=chat_context_enum)
+        db.add(chat)
+        db.commit()
+        db.refresh(chat)
+    
+    # Save the user's message
+    user_message = Message(
+        chat_id=chat.id,
+        content=user_message_content,
+        line_type=line_type_enum
+    )
+    db.add(user_message)
+    db.commit()
+    db.refresh(user_message)
+
+    # Generate the system's response
+    system_message_content = f"I see that you said: {user_message_content}. Let me work on this..."
+    
+    # Save the system message
+    system_message = Message(
+        chat_id=chat.id,
+        content=system_message_content,
+        line_type=MessageType["SYSTEM"]
+    )
+    db.add(system_message)
+    db.commit()
+
+    # generator = CodeGenerator()
+    # resp, error = generator.run(user_message_content)
+    # generated_content = "I've finished working and determined that I can't perform this action"
+
+    # if not error and resp:
+    #     # messages_url = f"http://localhost:8000/api/users/{userId}/chats/{chatContext}/messages"
+    #     generated_content = f"I've generated some output. Please check dummy_url"
+    
+    # # Save the system message
+    # system_message = Message(
+    #     chat_id=chat.id,
+    #     content=generated_content,
+    #     line_type=MessageType["SYSTEM"]
+    # )
+    # db.add(system_message)
+    # db.commit()
+
+    serialized_messages = [
+        {
+            "id": str(message.id),
+            "line_type": message.line_type.value,
+            "content": message.content,
+            "created_date": message.created_date.isoformat() if message.created_date else None
+        } for message in [user_message, system_message]
+    ]
+    
+    return {
+        "user": user.name,
+        "chat_context": chat_context_enum.value,
+        "messages": serialized_messages
+    }
+    

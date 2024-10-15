@@ -103,3 +103,4 @@ class CodeGenerator:
         if error:
             print("Error:")
             print(error)
+        return (output, error)

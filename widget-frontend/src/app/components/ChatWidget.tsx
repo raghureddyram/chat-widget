@@ -11,9 +11,10 @@ type Message = {
 
 interface ChatWidgetProps {
   userId: string;
+  userName: string;
 }
 
-const ChatWidget: React.FC<ChatWidgetProps> = ({ userId }) => {
+const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>('');
   const [showWidget, setShowWidget] = useState<boolean>(true);
@@ -35,19 +36,15 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId }) => {
     if (!input.trim()) return;
 
     const newMessage: Message = { line_type: 'user', content: input };
-    setMessages((prevMessages) => [...prevMessages, newMessage]);
-
     try {
-      const response = await fetch('/api/messages', {
+      const response = await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input, context: chatContext }),
+        body: JSON.stringify(newMessage),
       });
 
       const data = await response.json();
-      const botMessage: Message = { line_type: 'system', content: data.reply };
-
-      setMessages((prevMessages) => [...prevMessages, botMessage]);
+      setMessages((prevMessages) => [...prevMessages, ...data.messages]);
       setInput('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -84,14 +81,6 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId }) => {
         </div>
       )}
       <div className={styles.chatFooter}>
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Your question"
-          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-          className={styles.input}
-        />
         <select 
           value={chatContext} 
           onChange={(e) => setChatContext(e.target.value)}
@@ -100,6 +89,14 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId }) => {
           <option value="Onboarding">Onboarding</option>
           <option value="Sales">Sales</option>
         </select>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Your question"
+          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          className={styles.input}
+        />
       </div>
     </div>
   );

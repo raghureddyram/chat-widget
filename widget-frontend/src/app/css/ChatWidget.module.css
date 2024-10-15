@@ -61,17 +61,19 @@
   flex-grow: 1;
   padding: 10px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column; 
 }
 
 .userMessage {
   background-color: #8b1ba8;
   color: white;
-  align-self: flex-end;
+  align-items: flex-end;
   margin-left: auto;
-  margin: 10px 0;
   padding: 10px;
   border-radius: 10px;
   max-width: 80%;
+  
 }
 
 .systemMessage {
@@ -79,7 +81,6 @@
   color: black;
   display: flex;
   align-items: flex-start;
-  margin: 10px 0;
   padding: 10px;
   border-radius: 10px;
   max-width: 80%;

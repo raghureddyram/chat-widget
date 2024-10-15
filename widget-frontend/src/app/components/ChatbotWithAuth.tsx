@@ -35,7 +35,7 @@ const ChatboxWithAuth: React.FC = () => {
   }, []);
 
   // Show chatbox only if user is logged in
-  return user ? <ChatWidget userId={user.id} /> : null;
+  return user ? <ChatWidget userId={user.id} userName={user.name} /> : null;
 };
 
 export default ChatboxWithAuth;
