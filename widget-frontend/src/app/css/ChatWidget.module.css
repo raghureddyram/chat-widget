@@ -22,6 +22,14 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  z-index: 1000;
+}
+
+@media (max-width: 768px) {
+  .chatWidget {
+    height: 80vh;
+    width: 90vw;
+  }
 }
 
 .chatHeader {
@@ -31,14 +39,7 @@
   align-items: center;
 }
 
-.expandButton {
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.closeButton {
+.expandButton, .closeButton {
   background: none;
   border: none;
   font-size: 20px;
@@ -62,28 +63,33 @@
   padding: 10px;
   overflow-y: auto;
   display: flex;
-  flex-direction: column; 
+  flex-direction: column;
+  max-height: 60%; 
 }
 
 .userMessage {
   background-color: #8b1ba8;
   color: white;
-  align-items: flex-end;
   margin-left: auto;
   padding: 10px;
   border-radius: 10px;
   max-width: 80%;
-  
+  align-self: flex-end; 
 }
 
 .systemMessage {
   background-color: #f0f0f0;
   color: black;
-  display: flex;
-  align-items: flex-start;
   padding: 10px;
   border-radius: 10px;
   max-width: 80%;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+}
+
+.generatedDoc {
+  color: dodgerblue
 }
 
 .messageAvatar {
@@ -97,6 +103,7 @@
   display: flex;
   justify-content: space-around;
   padding: 10px;
+  flex-wrap: wrap; /* Ensure buttons wrap on smaller screens */
 }
 
 .actionButton {

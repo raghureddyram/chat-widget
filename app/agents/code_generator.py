@@ -6,7 +6,9 @@ import sys
 import tempfile
 from openai import OpenAI
 from ..config import OPENAI_API_KEY
-
+import pdb
+import uuid
+from pathlib import Path
 
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
@@ -53,22 +55,57 @@ class LibraryManager:
             print("Libraries installed successfully.")
 
 
+
+
+
 class CodeExecutor:
     @staticmethod
-    def execute_code(code):
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
-            temp_file.write(code)
-            temp_file_path = temp_file.name
+    def execute_code(code, requestor_id):
+        # Ensure the output directory exists
+        output_dir = os.path.join(os.getcwd(), 'output')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate a unique filename
+        filename = f"temp_{uuid.uuid4().hex}.py"
+        temp_file_path = os.path.join(output_dir, filename)
         
         try:
-            result = subprocess.run(['python', temp_file_path], capture_output=True, text=True, timeout=30)
+            # Write the code to the file
+            with open(temp_file_path, 'w') as temp_file:
+                temp_file.write(code)
+            
+            # Execute the code
+            result = subprocess.run(['python', temp_file_path], capture_output=True, text=True, timeout=30, cwd=output_dir)
             output = result.stdout
             error = result.stderr
+            
         except subprocess.TimeoutExpired:
             output = ""
             error = "Execution timed out after 30 seconds."
         finally:
-            os.unlink(temp_file_path)
+            # Clean up the temporary file
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+            for file in Path(output_dir).iterdir():
+                if file.is_file() and file.suffix != '.log':
+                    # Ensure the 'users/requestor_id' directory exists
+                    destination = Path(output_dir) / 'users' / requestor_id
+                    destination.mkdir(parents=True, exist_ok=True)
+
+                                # Prepare the new file name with versioning
+                    base_name = file.stem
+                    extension = file.suffix
+                    version = 1
+                    while True:
+                        new_file_name = f"{base_name}_v{version}{extension}"
+                        new_file_path = destination / new_file_name
+                        if not new_file_path.exists():
+                            break
+                        version += 1
+                    # Move the file to the 'users/requestor_id' directory
+                    file.rename(new_file_path)  # Actually move the file
+                    output = new_file_path
         
         return output, error
 
@@ -79,7 +116,7 @@ class CodeGenerator:
         self.library_manager = LibraryManager()
         self.code_executor = CodeExecutor()
 
-    def run(self, prompt):
+    def run(self, prompt, requestor_id=''):
         print(f"Generating code for: {prompt}")
         
         # Generate the Python code based on the prompt
@@ -94,7 +131,7 @@ class CodeGenerator:
         print("\nExecuting code...")
         
         # Execute the generated code
-        output, error = self.code_executor.execute_code(code)
+        output, error = self.code_executor.execute_code(code, requestor_id)
 
         # Print the output or errors from code execution
         if output:

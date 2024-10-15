@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react';
 import styles from '../css/ChatWidget.module.css'; // Importing CSS Module
+import Link from 'next/link';
 
 type Message = {
   id?: string;
@@ -19,6 +20,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
   const [input, setInput] = useState<string>('');
   const [showWidget, setShowWidget] = useState<boolean>(true);
   const [chatContext, setChatContext] = useState("Onboarding");
+  const [isEdit, setIsEdit] = useState(false);
+  const [newMessage, setNewMessage] = useState<Message>({ line_type: 'user', content: input });
 
   const getMessages = async () => {
     const resp = await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages`);
@@ -28,6 +31,51 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    try{
+        await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages/${messageId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        await getMessages()
+    } catch(e){
+        console.log(e)
+    }
+  };
+
+  const editMessage = async (message: Message) => {
+    setIsEdit(true)
+    setNewMessage(message)
+    setInput(message.content)
+  }
+
+  const handleEdit = async (message: Message) => {
+    const messageId = message.id;
+    try{
+        await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages/${messageId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(message)
+        });
+        setIsEdit(false)
+        setInput('')
+        await getMessages()
+    } catch(e){
+        console.log(e)
+    }
+  };
+
+  const handleSetInput = (newData: string) => {
+    setInput(newData)
+    if(isEdit){
+        const newMessageWithInput = { 
+            ...newMessage, 
+            content: newData 
+        }
+        setNewMessage(newMessageWithInput)
+    }
+  }
+
   useEffect(() => {
     getMessages();
   }, [chatContext]);
@@ -35,16 +83,17 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
   const sendMessage = async () => {
     if (!input.trim()) return;
 
-    const newMessage: Message = { line_type: 'user', content: input };
+    if(isEdit){
+        return handleEdit(newMessage)
+    }
+    
     try {
-      const response = await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages`, {
+      await fetch(`http://localhost:8000/api/users/${userId}/chats/${chatContext}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newMessage),
       });
-
-      const data = await response.json();
-      setMessages((prevMessages) => [...prevMessages, ...data.messages]);
+      await getMessages()
       setInput('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -53,6 +102,14 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
 
   if (!showWidget) return <button onClick={() => setShowWidget(true)} className={styles.openButton}>Open Chat</button>;
 
+  const createHtmlByContent = (content: string) => {
+    const parts = content.split("link: ")
+    if(parts.length > 1){
+        return (<p>Finished. I have <Link className={styles.generatedDoc} href={`${parts[parts.length - 1]}`}>generated your document</Link></p>)
+    }
+    
+    return (<p>{content}</p>)
+  }
   return (
     <div className={styles.chatWidget}>
       <div className={styles.chatHeader}>
@@ -70,7 +127,21 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
             {message.line_type === 'system' && (
               <img src="/api/placeholder/30/30" alt="Ava" className={styles.messageAvatar} />
             )}
-            <p>{message.content}</p>
+            {createHtmlByContent(message.content)}
+            {message.line_type === 'user' && (
+                <span>
+                <button 
+                  className={styles.deleteButton} 
+                  onClick={() => handleDeleteMessage(message.id as string)}
+                  aria-label="Delete message"
+                >X</button>
+                <button 
+                  className={styles.deleteButton} 
+                  onClick={() => editMessage(message)}
+                  aria-label="Edit message"
+                >edit</button>
+                </span>
+              )}
           </div>
         ))}
       </div>
@@ -92,7 +163,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ userId, userName }) => {
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => handleSetInput(e.target.value)}
           placeholder="Your question"
           onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
           className={styles.input}

@@ -15,3 +15,4 @@ class User(Base):
     
     # One user can have many chats
     chats = relationship("Chat", back_populates="user")
+    user_files = relationship("UserFile", back_populates="user")

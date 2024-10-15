@@ -9,11 +9,14 @@ from fastapi.staticfiles import StaticFiles
 from app.agents.code_generator import CodeGenerator
 from app.models.chat import ChatContextType
 from app.models.message import MessageType
+from app.models.user_file import UserFile
 from .auth_router import router as auth_router
 from .models import User, Message, Chat
 from .config import get_db
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from pathlib import Path
+import pdb
 
 app = FastAPI()
 
@@ -168,47 +171,96 @@ async def send_message(userId: str, chatContext: str, request: Request, db: Sess
     db.commit()
     db.refresh(user_message)
 
-    # Generate the system's response
-    system_message_content = f"I see that you said: {user_message_content}. Let me work on this..."
+    generator = CodeGenerator()
+    resp, error = generator.run(user_message_content, userId)
+    generated_content = "I've finished working and determined that I can't perform this action"
+
+    if resp and not error:
+        file = Path(resp)
+        file_name = file.name
+        new_user_file = UserFile(file_name=file_name, user_id=user.id)
+        db.add(new_user_file)
+        db.commit()
+        db.refresh(new_user_file)
+        output_view_url = f"http://localhost:8000/api/users/{userId}/user-files/{new_user_file.id}"
+        generated_content = f"I've generated some output. link: {output_view_url}"
+       
     
     # Save the system message
-    system_message = Message(
+    system_message_2 = Message(
         chat_id=chat.id,
-        content=system_message_content,
+        content=generated_content,
         line_type=MessageType["SYSTEM"]
     )
-    db.add(system_message)
+    db.add(system_message_2)
     db.commit()
 
-    # generator = CodeGenerator()
-    # resp, error = generator.run(user_message_content)
-    # generated_content = "I've finished working and determined that I can't perform this action"
-
-    # if not error and resp:
-    #     # messages_url = f"http://localhost:8000/api/users/{userId}/chats/{chatContext}/messages"
-    #     generated_content = f"I've generated some output. Please check dummy_url"
-    
-    # # Save the system message
-    # system_message = Message(
-    #     chat_id=chat.id,
-    #     content=generated_content,
-    #     line_type=MessageType["SYSTEM"]
-    # )
-    # db.add(system_message)
-    # db.commit()
-
-    serialized_messages = [
-        {
-            "id": str(message.id),
-            "line_type": message.line_type.value,
-            "content": message.content,
-            "created_date": message.created_date.isoformat() if message.created_date else None
-        } for message in [user_message, system_message]
-    ]
-    
     return {
         "user": user.name,
         "chat_context": chat_context_enum.value,
-        "messages": serialized_messages
+        "errors": []
+    }
+
+@app.delete("/api/users/{userId}/chats/{chatContext}/messages/{messageId}")
+async def delete_message(userId: str, chatContext: str, messageId: str, request: Request, db: Session = Depends(get_db)):
+    chat_context_enum = ChatContextType[chatContext.upper()]
+    # Check if user exists
+    user = db.query(User).filter(User.id == userId).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    chat = db.query(Chat).filter(Chat.user_id == user.id, Chat.context == chat_context_enum).first()
+    if not chat:
+        raise HTTPException(status_code=422, detail="Something went wrong")
+    
+    user_message = db.query(Message).filter(Message.id == messageId).first()
+    db.delete(user_message)
+    db.commit()
+
+    return {
+        "user": user.name,
+        "chat_context": chat_context_enum.value,
+        "errors": []
+    }
+
+@app.put("/api/users/{userId}/chats/{chatContext}/messages/{messageId}")
+async def update_message(userId: str, chatContext: str, messageId: str, request: Request, db: Session = Depends(get_db)):
+    data = await request.json()
+    chat_context_enum = ChatContextType[chatContext.upper()]
+    # Check if user exists
+    user = db.query(User).filter(User.id == userId).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    chat = db.query(Chat).filter(Chat.user_id == user.id, Chat.context == chat_context_enum).first()
+    if not chat:
+        raise HTTPException(status_code=422, detail="Something went wrong")
+    
+    # Check if message exists and belongs to the user and chat
+    message = db.query(Message).filter(
+        Message.id == messageId,
+        Message.chat_id == chat.id
+    ).first()
+    
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    # Update the message
+    new_content = data.get('content')
+    if new_content is None:
+        raise HTTPException(status_code=400, detail="New message content is required")
+    
+    message.content = new_content
+    db.commit()
+    db.refresh(message)
+
+    return {
+        "user": user.name,
+        "chat_context": chat_context_enum.value,
+        "message": {
+            "id": message.id,
+            "content": message.content,
+        },
+        "errors": []
     }
     
