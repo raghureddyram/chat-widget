@@ -3,7 +3,7 @@ Agent-based chat widget!
 Installation:
 
 ```
-pip install poetry
+pip install poetry 
 ```
 ```
 poetry install --no-root
